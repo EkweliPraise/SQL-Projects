@@ -1,0 +1,69 @@
+-- Which products and facotires deliver the highest grss-profit margin over time?
+-- CREATE A VIEW CONTAINING ALL THE COLUMNS USED THROUGH OUT THE ANALYSIS
+create view Sales_data as
+select cs.*,
+		cp.Factory,
+		round ((cs.Gross_Profit/cs.Sales)*100,2) Profit_margin,
+		FORMAT (cs.order_date, 'yyyy-MM') as Order_month
+from Candy_Products cp
+join Candy_Sales cs
+on cp.Product_ID=cs.Product_ID
+ 
+select 	datename (MONTH,Order_Date) 'Month',
+		Product_Name,
+		Ship_Mode,
+		AVG(Profit_margin) Avg_Profit_margin,
+		Round(sum (gross_profit),2) Total_Profit,
+		Round(sum (sales),2) Total_Sales
+from Sales_data
+group by datename (MONTH,Order_Date),Product_Name,Ship_Mode
+order by datename (MONTH,Order_Date), AVG(Profit_margin) desc
+
+-- what is the monthly over month revenue growth and are there seasonal peaks?
+with Monthly_revenue as
+(select datename (month,Order_Date) order_month,
+		datepart (month,Order_Date) Month_No,
+Round(sum (sales),2) Total_Sales,
+		avg (profit_margin) Avg_profit_margin
+from Sales_data
+Group by datename (month,Order_Date),datepart (month,Order_Date)
+)
+
+select *,
+round (100* (Total_Sales-lag(Total_Sales) over (order by month_no))/lag(Total_Sales) over (order by month_no),2) Growth_percentage
+from Monthly_revenue
+
+
+-- how does shipping mode influence delivery lead time and sales value?
+with shipping_analysis as
+(select Ship_Mode,
+		Sales,
+		DATEDIFF (MONTH, Order_Date, Ship_Date) 'Lead_time',
+		DATEDIFF (DAY, Order_Date, Ship_Date) 'Lead_days'
+from Sales_data)
+select ship_mode,
+		count (*) Orders,
+		avg (lead_time) Avg_lead_time,
+		avg (lead_days) Avg_lead_days,
+		sum (sales) total_sales,
+		Avg (sales) Avg_sales
+from shipping_analysis
+group by ship_mode
+
+--which regions show the fastest year over year growth in units an d reveue
+
+select datename (MONTH,Order_date)  'month',
+		ship_mode,
+		round(sum (sales),2) total_sales,
+		sum (units) total_units
+from Sales_data
+group by datename (MONTH,Order_date),Ship_Mode
+
+
+-- calculations for the KPIs
+select count (*) total_orders,
+		round (sum (sales),2) total_sales,
+		sum (units) total_units,
+		count (distinct Product_ID) NUmber_products,
+		round (avg (profit_margin),2) Avg_profit_margin
+from Sales_data
